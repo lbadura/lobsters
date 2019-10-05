@@ -34,6 +34,7 @@ class Comment < ApplicationRecord
   scope :not_moderated, -> { where(is_moderated: false) }
   scope :active, -> { not_deleted.not_moderated }
   scope :for_user, ->(user) { user && user.is_moderator? ? all : active }
+  scope :from_last_48_hours, -> { where(created_at: 48.hours.ago..Time.zone.now) }
 
   DOWNVOTABLE_DAYS = 7
   DELETEABLE_DAYS = DOWNVOTABLE_DAYS * 2
@@ -139,6 +140,13 @@ class Comment < ApplicationRecord
   def self.score_sql
     Arel.sql("(CAST(upvotes AS #{Story.votes_cast_type}) - " <<
       "CAST(downvotes AS #{Story.votes_cast_type}))")
+  end
+
+  def self.recent_url_mentions(url)
+    return [] if url.nil?
+    self.from_last_48_hours.select do |c|
+      URI.extract(c.comment).any? {|found_url| found_url == url }
+    end
   end
 
   def as_json(_options = {})
